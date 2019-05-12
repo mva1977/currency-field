@@ -1,36 +1,187 @@
 <link rel="import" href="../polymer/polymer-element.html">
+<link rel="import" href="../vaadin-text-field/vaadin-text-field.html">
 
 <dom-module id="currency-field">
-  <template>
-    <style>
-      :host {
-        display: block;
-      }
-    </style>
-    <h2>Hello [[prop1]]!</h2>
-  </template>
+    <script>
+        /**
+         * `currency-field`
+         *
+         *
+         * @customElement
+         * @polymer
+         * @demo demo/index.html
+         */
+        class CurrencyField extends Vaadin.TextFieldElement {
+            static get is() {
+                return 'currency-field';
+            }
 
-  <script>
-    /**
-     * `currency-field`
-     * 
-     *
-     * @customElement
-     * @polymer
-     * @demo demo/index.html
-     */
-    class CurrencyField extends Polymer.Element {
-      static get is() { return 'currency-field'; }
-      static get properties() {
-        return {
-          prop1: {
-            type: String,
-            value: 'currency-field'
-          }
-        };
-      }
-    }
+            static get properties() {
+                return {};
+            }
 
-    window.customElements.define(CurrencyField.is, CurrencyField);
-  </script>
+            ready() {
+                super.ready();
+                this.inputElement.addEventListener("keydown", this.__onKeyDown.bind(this));
+                this.inputElement.addEventListener("keypress", this.__onKeyPress.bind(this));
+
+            }
+
+            __onKeyPress(event) {
+                const c = event.key;
+                try {
+                    const text = this.inputElement.value;
+                    let pos = this.inputElement.selectionStart;
+                    const sb = [];
+                    if (text) {
+                        sb.push(text.substr(0, pos));
+                        sb.push(c);
+                        sb.push(text.substr(this.inputElement.selectionEnd));
+                    } else {
+                        if (c === '.') {
+                            sb.push("0");
+                            pos++;
+                        }
+                        sb.push(c);
+                    }
+                    this.trySetText(sb.join(""), pos + 1);
+                } finally {
+                    event.preventDefault();
+                }
+            }
+
+            trySetText(text, cursorPos) {
+                {
+                    //try {
+                    let parsedText = this.parsedText(text, cursorPos);
+                    this.inputElement.value = parsedText.text;
+                    this.inputElement.setSelectionRange(parsedText.cursorPos, parsedText.cursorPos);
+                    this.set('value', parsedText.text);
+                    return true;
+                    //} catch (CurrencyFormatException e) {
+                    //fireEvent(new CurrencyFormatErrorEvent(text));
+                    //reurn false;
+                }
+
+            }
+
+            __onKeyDown(event) {
+                const sb = [];
+                const text = this.inputElement.value;
+                let prevPos = this.inputElement.selectionStart;
+                switch (event.key) {
+                    case 'Delete':
+                        if (text) {
+                            const l = text.length;
+                            if (prevPos < l) {
+                                sb.push(text.substr(0, prevPos));
+                                const s = this.inputElement.selectionEnd - this.inputElement.selectionStart;
+                                if (s === 0) {
+                                    if (text.charAt(prevPos) === ' ' && prevPos < l - 1) {
+                                        sb.push(text.substr(prevPos + 2, l));
+                                    } else {
+                                        sb.push(text.substr(prevPos + 1, l));
+                                    }
+                                } else {
+                                    sb.push(text.substr(prevPos + s, l));
+                                }
+                                this.trySetText(sb.join(''), prevPos);
+                                event.preventDefault();
+                            }
+                        }
+                        break;
+                    case 'Backspace':
+                        if (text) {
+                            let pos = prevPos;
+                            let s = this.inputElement.selectionEnd - this.inputElement.selectionStart;
+                            let l = text.length;
+                            if (s > 0) {
+                                sb.push(text.substr(0, pos));
+                                sb.push(text.substr(pos + s, l));
+                            } else {
+                                if (pos > 0) {
+                                    if (pos > 1 && text.charAt(pos - 1) === ' ')
+                                        pos--;
+                                    sb.push(text.substr(0, pos - 1));
+                                    sb.push(text.substr(pos, l));
+                                } else {
+                                    break;
+                                }
+                            }
+                            this.trySetText(sb.join(""), pos - 1);
+                            event.preventDefault();
+                        }
+                        break;
+                }
+
+            }
+
+
+            parsedText(text, cursorPos) {
+                const sb = [];
+                let allowDecimalSeparator = true;
+                let c;
+                const l = text.length;
+                if (cursorPos > l)
+                    cursorPos = l;
+                if (cursorPos < 0)
+                    cursorPos = 0;
+                let digitNum = 0;
+                let spaceNum = 0;
+                for (let i = l; i > 0; i--) {
+                    c = text.charAt(i - 1);
+                    switch (c) {
+                        case ' ':
+                        case '\r':
+                            if (cursorPos >= i)
+                                cursorPos--;
+                            break;
+                        case '.':
+                            if (!allowDecimalSeparator)
+                                throw CurrencyFormatException.forInputString(text);
+                            allowDecimalSeparator = false;
+                            for (let j = sb.length; j > 0; j--) {
+                                if (sb[j - 1] === ' ') {
+                                    sb.splice(j - 1, 1);
+                                }
+                            }
+                            spaceNum = 0;
+                            digitNum = 0;
+                            break;
+                        case '0':
+                        case '1':
+                        case '2':
+                        case '3':
+                        case '4':
+                        case '5':
+                        case '6':
+                        case '7':
+                        case '8':
+                        case '9':
+                            digitNum++;
+                            if (digitNum > 3 && digitNum % 3 === 1) {
+                                sb.push(' ');
+                                if (cursorPos > i) {
+                                    spaceNum++;
+                                }
+                            }
+                            break;
+                        default:
+                            throw CurrencyFormatException.forInputString(text);
+                    }
+                    if (c !== ' ')
+                        sb.push(c);
+                }
+                cursorPos += spaceNum;
+                return {
+                    text: sb.reverse().join(""),
+                    cursorPos: cursorPos
+                }
+            }
+
+        }
+
+
+        window.customElements.define(CurrencyField.is, CurrencyField);
+    </script>
 </dom-module>
