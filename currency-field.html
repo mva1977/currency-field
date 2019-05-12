@@ -1,0 +1,36 @@
+<link rel="import" href="../polymer/polymer-element.html">
+
+<dom-module id="currency-field">
+  <template>
+    <style>
+      :host {
+        display: block;
+      }
+    </style>
+    <h2>Hello [[prop1]]!</h2>
+  </template>
+
+  <script>
+    /**
+     * `currency-field`
+     * 
+     *
+     * @customElement
+     * @polymer
+     * @demo demo/index.html
+     */
+    class CurrencyField extends Polymer.Element {
+      static get is() { return 'currency-field'; }
+      static get properties() {
+        return {
+          prop1: {
+            type: String,
+            value: 'currency-field'
+          }
+        };
+      }
+    }
+
+    window.customElements.define(CurrencyField.is, CurrencyField);
+  </script>
+</dom-module>
